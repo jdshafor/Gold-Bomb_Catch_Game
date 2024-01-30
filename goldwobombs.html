@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gold Catcher Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+
+    #game-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: url('https://pages.mtu.edu/~cai/cyberhusky/goldgame/sky.jpg') center/cover;
+    }
+
+    #basket {
+      position: absolute;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80px;
+      height: 50px;
+      background: url('https://pages.mtu.edu/~cai/cyberhusky/goldgame/rocket.png') center/cover;
+    }
+
+    .gold,
+    .bomb {
+      position: absolute;
+    }
+
+    .gold {
+      background: url('https://pages.mtu.edu/~cai/cyberhusky/goldgame/rock.png') center/cover;
+    }
+
+    .bomb {
+      background: url('https://cdn.pixabay.com/photo/2017/01/31/16/59/bomb-2025548_640.png') center/cover;
+      width: 40px;
+      height: 40px;
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 18px;
+      color: white;
+    }
+
+    #timer {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 18px;
+      color: white;
+    }
+
+    #explosion {
+      position: absolute;
+      display: none;
+      width: 100px; /* Adjust the width of the explosion to cover the basket */
+      height: 100px; /* Adjust the height of the explosion to cover the basket */
+      background-size: cover;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="game-container">
+    <div id="basket"></div>
+    <div id="score">Score: 0</div>
+    <div id="timer">Time: 60s</div>
+    <audio id="catch-sound">
+      <source src="https://pages.mtu.edu/~cai/cyberhusky/goldgame/hit.mp3">
+    </audio>
+    <img id="explosion" src="https://i.gifer.com/YQDj.gif" alt="Explosion">
+  </div>
+
+  <script>
+    const basket = document.getElementById('basket');
+    const scoreDisplay = document.getElementById('score');
+    const timerDisplay = document.getElementById('timer');
+    const catchSound = document.getElementById('catch-sound');
+    const explosion = document.getElementById('explosion');
+    let score = 0;
+    let timer = 60;
+
+    function updateScore() {
+      scoreDisplay.textContent = `Score: ${score}`;
+    }
+
+    function updateTimer() {
+      timerDisplay.textContent = `Time: ${timer}s`;
+    }
+
+    function getRandomPosition() {
+      const x = Math.random() * (window.innerWidth - 20);
+      const y = -20; // Start above the viewport
+      return {
+        x,
+        y
+      };
+    }
+
+    function calculatePoints(itemType, size) {
+      // Adjust the points calculation as per your preference
+      if (itemType === 'gold') {
+        if (size < 30) {
+          return 30; // Small gold, worth 30 points
+        } else if (size < 40) {
+          return 20; // Medium gold, worth 20 points
+        } else {
+          return 10; // Large gold, worth 10 points
+        }
+      } else if (itemType === 'bomb') {
+        return -25; // Bomb, lose 25 points
+      }
+      return 0;
+    }
+
+    function createItem(itemType) {
+      const item = document.createElement('div');
+      item.className = itemType;
+      const {
+        x,
+        y
+      } = getRandomPosition();
+      item.style.left = `${x}px`;
+      item.style.top = `${y}px`;
+      document.getElementById('game-container').appendChild(item);
+
+      // Set fixed sizes for gold and bombs
+      const itemSize = itemType === 'bomb' ? 40 : Math.floor(Math.random() * 40) + 20; // Increased range for larger items
+      item.style.width = `${itemSize}px`;
+      item.style.height = `${itemSize}px`;
+
+      // Set a data attribute to store the points value
+      item.dataset.points = calculatePoints(itemType, itemSize);
+
+      return item;
+    }
+
+    function moveItems(itemType, intervalId) {
+      const item = createItem(itemType);
+      let hasBeenCaught = false;
+
+      // Move items downwards
+      setInterval(() => {
+        const currentTop = parseInt(item.style.top, 10);
+        item.style.top = `${currentTop + 2}px`;
+
+        // Check if item reaches the bottom
+        if (currentTop >= window.innerHeight) {
+          item.style.top = '-20px'; // Reset position to the top
+        }
+
+        // Check if item is caught by the basket
+        if (!hasBeenCaught &&
+          currentTop + item.clientHeight >= basket.offsetTop &&
+          currentTop <= basket.offsetTop + basket.clientHeight &&
+          (
+            (parseInt(item.style.left, 10) >= basket.offsetLeft &&
+              parseInt(item.style.left, 10) <= basket.offsetLeft + basket.clientWidth) ||
+            (parseInt(item.style.left, 10) + item.clientWidth >= basket.offsetLeft &&
+              parseInt(item.style.left, 10) + item.clientWidth <= basket.offsetLeft + basket.clientWidth) ||
+            (parseInt(item.style.left, 10) <= basket.offsetLeft &&
+              parseInt(item.style.left, 10) + item.clientWidth >= basket.offsetLeft + basket.clientWidth)
+          )
+        ) {
+          if (itemType === 'bomb') {
+            score += parseInt(item.dataset.points, 10);
+            updateScore();
+            catchSound.currentTime = 0; // Reset sound to play from the beginning
+            catchSound.play();
+            explode();
+          } else {
+            score += parseInt(item.dataset.points, 10);
+            updateScore();
+          }
+          hasBeenCaught = true;
+          item.remove();
+          clearInterval(intervalId);
+        }
+      }, 10);
+    }
+
+    function explode() {
+      explosion.style.left = `${basket.offsetLeft}px`; // Set explosion position to cover the basket
+      explosion.style.top = `${basket.offsetTop}px`; // Set explosion position to cover the basket
+      explosion.style.display = 'block';
+      setTimeout(() => {
+        explosion.style.display = 'none';
+      }, 500); // Adjust the delay as needed
+    }
+
+    function startGame() {
+      setInterval(() => {
+        moveItems('gold');
+        moveItems('bomb');
+      }, 1000);
+
+      // Update timer every second
+      setInterval(() => {
+        timer--;
+        updateTimer();
+
+        // End game when timer reaches 0
+        if (timer === 0) {
+          catchSound.pause(); // Pause catch sound
+          alert(`Game Over! Your final score is ${score}`);
+          location.reload(); // Reload the page to restart the game
+        }
+      }, 1000);
+    }
+
+    // Move basket using arrow keys
+    window.addEventListener('keydown', (e) => {
+      const step = 10;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          if (basket.offsetLeft - step >= 0) {
+            basket.style.left = `${basket.offsetLeft - step}px`;
+          }
+          break;
+        case 'ArrowRight':
+          if (basket.offsetLeft + basket.clientWidth + step <= window.innerWidth) {
+            basket.style.left = `${basket.offsetLeft + step}px`;
+          }
+          break;
+      }
+    });
+
+    startGame();
+  </script>
+</body>
+
+</html>
+
+
+
+
+
+
